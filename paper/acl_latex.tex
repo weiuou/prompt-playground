@@ -1,0 +1,117 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[preprint]{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{amsfonts}
+\usepackage{array} % for p{} column type
+\usepackage{graphicx} % for \resizebox
+\usepackage{makecell}
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\newcommand{\ie}{\emph{i.e., }}
+\newcommand{\eg}{\emph{e.g., }}
+\newcommand{\etal}{\emph{et al. }}
+\newcommand{\st}{\emph{s.t. }}
+\newcommand{\etc}{\emph{etc.}}
+\newcommand{\wrt}{\emph{w.r.t. }}
+\newcommand{\cf}{\emph{cf. }}
+\newcommand{\aka}{\emph{a.k.a. }}
+\newcommand{\edit}[1]{\textcolor{blue}{#1}}
+\newcommand{\fb}{\textcolor{blue}}
+\newcommand{\mx}{\textcolor{red}}
+
+
+\title{Dual-Phase Accelerated Prompt Optimization}
+
+
+\author{
+Muchen Yang\textsuperscript{1}, 
+~Moxin Li\textsuperscript{2}\thanks{\hspace{2mm}Corresponding Author},
+~Yongle Li\textsuperscript{3}, 
+~Zijun Chen\textsuperscript{3}, \\
+\textbf{
+~Chongming Gao\textsuperscript{1}\footnotemark[1],
+~Junqi Zhang\textsuperscript{4},
+~Yangyang Li\textsuperscript{5},
+~Fuli Feng \textsuperscript{1,3}
+}
+\\
+\textsuperscript{1}University of Science and Technology of China, 
+~\textsuperscript{2}National University of Singapore\\
+\textsuperscript{3}Institute of Dataspace, Hefei Comprehensive National Science Center \\
+~\textsuperscript{4}AtomEcho Inc.,
+~\textsuperscript{5}Academy of Cyber
+\\
+\tt{muchen00@mail.ustc.edu.cn},
+\tt{limoxin@u.nus.edu},
+~\tt{liyongle999@gmail.com}\\
+~\tt{zijunchen248@gmail.com},
+\tt{chongminggao@ustc.edu.cn},
+~\tt{zhangjunqi@atomecho.xyz}\\ 
+~\tt{liyangyang@live.com},
+~\tt{fulifeng93@gmail.com}\\
+}
+
+\begin{document}
+\maketitle
+
+
+\begin{abstract}
+Gradient-free prompt optimization methods have made significant strides in enhancing the performance of closed-source Large Language Models (LLMs) across a wide range of tasks. 
+However, existing approaches make light of the importance of high-quality prompt initialization and the identification of effective optimization directions, thus resulting in substantial optimization steps to obtain satisfactory performance.
+In this light, we aim to accelerate prompt optimization process to tackle the challenge of low convergence rate. 
+We propose a dual-phase approach which starts with generating high-quality initial prompts by adopting a well-designed meta-instruction to delve into task-specific information, and iteratively optimize the prompts at the sentence level, leveraging previous tuning experience to expand prompt candidates and accept effective ones.
+Extensive experiments on eight datasets demonstrate the effectiveness of our proposed method, achieving a consistent accuracy gain over baselines with less than five optimization steps. 
+
+\end{abstract}
+
+\input{1_introduction_0614}
+\input{2_related_work}
+\input{3_method}
+\input{4_experiments}
+\input{5_conclusion}
+\input{7_Acknowledgement}
+
+\clearpage
+\newpage
+\input{6_limitation}
+
+\bibliography{custom}
+
+\end{document}

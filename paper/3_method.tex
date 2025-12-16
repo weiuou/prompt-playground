@@ -1,0 +1,185 @@
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=0.95\linewidth]{figs/method.pdf}
+    % \vspace{-3mm}
+    \caption{Illustration of the proposed method.}
+    \label{fig:method}
+    % \vspace{-2mm}
+\end{figure*}
+
+
+
+\section{Problem Formulation}
+
+\subsection{Gradient-Free Prompt Optimization}
+For a target NLP task $\mathcal{T}$ with input $x$, the closed-source LLM predicts the output $\hat{y}$ given $x$ concatenated with the prompt $p$, where $x, \hat{y}$ and $p$ are all word sequences.
+The aim for prompt optimization is to find an optimal prompt $p^*$ that obtains the desired $\hat{y}$, which can be evaluated by metrics such as accuracy with reference to the ground truth $y$. 
+The gradient-free prompt optimization contains an initialization phase followed by $K$ iterative optimization steps. The $k$-th optimization step starts from an initial prompt $p_{k-1}, k \in [1, K]$, and sequentially performs two stages: expansion of prompt candidates, and acceptance of the prominent prompts as the next initial prompts, as detailed below. 
+
+
+
+\paragraph{Expansion of Prompt Candidates.}
+At the $k$-th optimization step, The expansion stage search for new prompt candidates with potential better performance starting from $p_{k-1}$, with searching methods 
+such as edit-based \cite{Prasad2022GrIPSGE} and LLM rewriting \cite{Pryzant2023AutomaticPO}. 
+Formally, the expansion function $f_E(\cdot)$ generates prompt candidate set $P^c_k = \{p^c_{k_1}, \cdots, p^c_{k_Q} \}$ with size $Q$.
+\begin{align}
+    P^c_k = f_E(p_{k-1}). 
+\end{align}
+
+
+\paragraph{Acceptance of Prominent Prompts.}
+The acceptance stage evaluates the performance of each prompt candidate in $P^c_k$ to determine whether it should be continued for next optimization step. This is usually achieved by evaluation on a held-out validation set $V = \{(x^v, y^v)\}$, and accepting the top-performing prompt candidates. Formally, with the evaluation function on LLM as $f_S(\cdot)$,
+\begin{align}
+    r^k_i &= f_S(p^c_{k_i}, V), i\in[1, \cdots, Q], \\ \notag
+    p_{k} &= p^c_{k_j}, \text{where } j = \text{argmax}(\{r^k_1, ..., r^k_Q\}). 
+\end{align}
+where $\text{argmax}(\cdot)$ denotes the index of the maximum value. 
+At the final optimization step, the top-performing prompt $p_{K}$ will be accepted as the optimized prompt $p^*$. 
+
+
+\subsection{Accelerated Prompt Optimization}
+Although current research on gradient-free prompt optimization can achieve significant performance gains on multiple tasks, demands for a great number of optimization steps hinder their practicability in real-world scenarios. 
+For instance, \citet{Yang2023LargeLM} does not converge even after over 150 steps in some tasks; \citet{Wang2023PromptAgentSP} finds a good solution in % fewer than 100 iteration steps.
+50 to 75 steps. 
+Therefore, we highlight the problem of accelerated prompt optimization, \ie obtaining $p^*$ with satisfactory performance in few optimization steps, \eg $K<5$. 
+
+
+\section{Proposed Method}
+
+
+\subsection{Motivation}
+We believe that two factors are crucial for achieving accelerated prompt optimization, which current gradient-free prompt optimization methods fail to achieve.
+Firstly, the initial prompt $p_0$ plays a crucial role in accelerating the prompt optimization process \cite{Ye2023PromptEA}, where $p_0$ with better LLM performance makes the optimization towards better prompts easier, preventing LLMs from excessively exploring suboptimal prompt regions. 
+This is generally overlooked by existing research that utilizes uninformative initial prompts, \eg \cite{Yang2023LargeLM}. Therefore, we propose to devise high-quality $p_0$ by crafting a novel initial prompt schema. 
+Furthermore, a more precise expansion and acceptance of prompt candidates ensure highly efficient optimization direction and fewer optimization steps. 
+Current expansion and acceptance techniques optimize the prompt towards improving the general task performance, where effective optimization direction in each step is hard to ensure. 
+To tackle this, we propose to utilize the past failure cases from previous optimization steps to further navigate the expansion and acceptance of prompt candidates. 
+We illustrate our dual-phase approach as follows (\cf Figure~\ref{fig:method}).  
+
+\subsection{High-Quality Initial Prompt Generation}
+We think that a high-quality initial prompt that can elicit the desired response from LLMs should be able to provide clear task instruction and detailed task-related information. Specifically, it should
+1) give a clear definition of the task type and provide a detailed task description, 
+2) define the output format and constraints, 
+3) provide insights on the reasoning processes and professional tips.
+To achieve such initial prompts, we are inspired by the step-back prompting \cite{Zheng2023TakeAS} which demonstrates LLM's ability to derive high-level concepts and principles from examples. 
+Thus, following \cite{Zhou2022LargeLM}, we design a meta-instruction $I_m$ (\cf Figure~\ref{fig:meta-initial}), leveraging LLM's ability to generate $p_0$ by observing the input-output exemplars of the target task $\mathcal{T}$ and inferring the above required information. Formally, defining %randomly sampled 
+input-output exemplars as $D = \{(x_d, y_d)\}$, 
+\begin{align}
+    p_0 = LLM(I_m, D). \label{eq:init_p0}
+\end{align}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\linewidth]{figs/meta-initial.pdf}
+    \caption{Meta-instruction used in our initialization phase to generate high-quality initial prompts.}
+    \label{fig:meta-initial}
+\end{figure}
+
+
+\subsection{Experience-Tuned Optimization}
+In the optimization phase, it is necessary to tune the expansion and acceptance of prompt candidates to quickly improve the task performance as evaluated on the validation set $V$ and thus reduce optimization steps. 
+Inspired by previous research \cite{Pryzant2023AutomaticPO}, we intend to make the best of past failure cases to generate promising prompt candidates and filter out unnecessary optimization attempts.
+In each optimization step, we maintain a failure case set $F_k = \{(x_k^f, y_k^f)\}$ containing the examples from $V$ where the initial prompt $p_{k-1}$ fails to predict the ground truth in the acceptance stage, \ie $\hat{y}_k^f \neq y_k^f$. 
+
+
+\paragraph{Expansion.}
+In the expansion stage, since the initial prompts are long prompts with at least four sentences, we aim to improve the expansion efficiency by segmenting them into individual sentences for sentence-level expansion following LongPO \cite{Hsieh2023AutomaticEO}. 
+Moreover, since different sentences in the initial prompts contain different task-related information and may have different impacts on the task performance, we devise sentence weights $w^k$ to estimate the impact of each sentence on the performance improvement, 
+which is updated leveraging the past failure cases. 
+We first split the initial prompt $p_0$ into $M$ sentences, and initialize the weight $w^1$ for each sentence as 1. 
+\begin{align}
+    p_0  &= [s^1_1,s^{1}_2,...,s^{1}_{M} ], \\ \notag
+    w^1_t & = 1, t \in [1, M]. 
+\end{align}
+In the $k$-th optimization step, we compute the acceptance probability $\text{Pr}^k$ for each sentence: 
+\begin{align}
+\label{eq:selection_prob}
+     \text{Pr}^k_i &= \frac{\exp(w^{k}_i)}{\sum_{j=1}^{M} \exp(w^k_j)}. 
+    % &i \in \{1, 2, \ldots, M\}.
+\end{align}
+
+After that, we sample a sentence for expansion based on the probability distribution $\text{Pr}^k = [\text{Pr}^k_1, \cdots, \text{Pr}^k_{M}]$, where the sampled sentence is denoted as $s^k_o, o \in [1, M]$. 
+For expansion of $s^k_o$, we 
+design a meta-instruction $I_e$ (\cf Figure~\ref{fig:meta-optimize}) to instruct LLM to generate a revised sentence considering the past experience. 
+\begin{align}
+    % \hat{s}^k_o = LLM(I_e, p_{k-1}, U_k, s^k_o).
+    \label{eq:meta_optimize_generation}
+    \hat{s}^k_o = LLM(I_e, p_{k-1}, F_k, s^k_o).
+\end{align}
+
+Before passing $\hat{s}^k_o$ to the acceptance stage, we design additional strategies to further guarantee the effectiveness of the generated sentence leveraging $F_k$. 
+Firstly, to ensure $\hat{s}^k_o$ can actually improve over $s^k_o$, we replace $s^k_o$ in $p_{k-1}$ with $\hat{s}^k_o$, denoted as $\hat{p}_k$, and evaluate whether $\hat{p}_k$ outperforms $p_{k-1}$ on $F_k$. 
+We accept $\hat{s}^k_o$ only when $\hat{p}_k$ has improved the performance over $p_{k-1}$ larger than a threshold $H_F$. % Denoting the performance of $\hat{p}_k$ on $U_k$ as $\hat{t}^k$, and that for $p_k$ as $t^k$. 
+\begin{align}
+    f_S(\hat{p}_k, F_k) - f_S(p_{k-1}, F_k) > H_F. \label{eq:H_F}
+\end{align}
+Besides, to avoid repeatedly generating the same ineffective $\hat{s}^k_o$, we build a collection $\mathcal{G}$ of undesired sentence revisions and check whether $\hat{s}^k_o$ has appeared in $\mathcal{G}$. If the above two criteria are not met, we abandon $\hat{s}^k_o$ and regenerate starting from Eq.~\ref{eq:meta_optimize_generation}. 
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\linewidth]{figs/meta-optimize.pdf}
+    \vspace{-2mm}
+    \caption{Meta-instruction used in the optimization phase.}
+    \label{fig:meta-optimize}
+    \vspace{-2mm}
+\end{figure}
+
+
+
+\paragraph{Acceptance.}
+
+
+In addition to evaluating $\hat{p}_k$'s performance on the entire failure case $F_k$, we also evaluate its performance on the validation set $V$.
+We accept $\hat{p}_k$ as the next initial prompt $p_k$ only when $\hat{p}_k$ has improved the performance over $p_{k-1}$ larger than a threshold $H_V$. Otherwise, we abandon $\hat{p}^k$ and restart from sampling $s^k_o$. 
+\begin{align}
+\label{eq:H_V}
+    f_S(\hat{p}_k, V) - f_S(p_{k-1}, V) > H_V.  
+\end{align}
+If $\hat{p}^k$ is accepted, we update its sentence weights.
+We calculate the mixed evaluation result $f_R(\cdot)$ and update the $w^{k+1}$ as follows, where $\alpha$ and the learning rate $\eta$ are adjusting hyperparameters. 
+\begin{align}
+    f_R(\hat{p}_k) & = \alpha f_S(\hat{p}_k, V) + (1-\alpha) f_S(\hat{p}_k, F_k). \\ \notag
+    w^{k+1}_i & = w^k_i \exp(\frac{\eta f_R(\hat{p}_k)}{\text{Pr}^k_i M}).
+\end{align}
+When the number of times that Eq.~\ref{eq:H_F} or Eq.~\ref{eq:H_V} is not satisfied
+accumulates to 5, we consider the algorithm to have converged.
+
+The weight formula is designed to adaptively update the importance of each sentence in the prompt based on its impact on overall performance improvement. $f_R(\hat{p}_k)$ modulates the magnitude of the weight adjustment: a higher $f_R(\hat{p}_k)$ leads to larger updates. $\text{Pr}^k_i$ determines the weight's contribution, while $M$ is used for normalization to ensure balanced weight updates. The learning rate $\eta$ controls the extent of weight adjustments based on the evaluation feedback. Inspired by the EXP3 algorithm \cite{Auer1995GamblingIA}, these components facilitate a dynamic and adaptive optimization process, tuned by empirical performance data.
+The who process is summarized in Algorithm~\ref{algo}. 
+
+
+
+\begin{algorithm}
+\centering
+\caption{\\ Dual-Phase Accelerated Prompt Optimization}
+\label{algo}
+\begin{algorithmic}[1]
+\Require Input-output exemplars $D$, validation set $V$, 
+meta-instruction $I_m$ and $I_e$.
+\Ensure Optimized prompt $p^*$
+\State Initialize $p_0$ (Eq.~\ref{eq:init_p0}),  derive failure case set $F_1$
+\State Split $p_0$ into $M$ sentences $[s^1_1, s^1_2, \ldots, s^1_M]$, initialize sentence weights $\{w^1_i\}_{i=1}^M \gets 1$, $k \gets 1$
+\While{not converged}
+    \State $\triangleright{\textit{\textbf{  Expansion}}}$
+    \State Sample a sentence $s^k_o$ based on $\text{Pr}^k$ (Eq.~\ref{eq:selection_prob}) \label{Sample a sentence}
+    \State Generate revised sentence $\hat{s}^k_o$ (Eq.~\ref{eq:meta_optimize_generation})\label{Generate revised sentence}
+    \State Replace $s^k_o$ in $p_{k-1}$ with $\hat{s}^k_o$ to get $\hat{p}_k$
+    \If{$\hat{s}^k_o \in \mathcal{G}$ \textbf{or} (Eq.~\ref{eq:H_F}) is not satisfied}
+        \State Add $\hat{s}^k_o$ to $\mathcal{G}$
+        \State Regenerate $\hat{s}^k_o$ from line \ref{Generate revised sentence}
+    \EndIf
+    
+    \State $\triangleright{\textit{\textbf{  Acceptance}}}$
+    \If{(Eq.~\ref{eq:H_V}) is not satisfied}
+        \State Restart from line \ref{Sample a sentence}
+    \EndIf
+    \State $p_{k} \leftarrow \hat{p}_k$, update $w^{k+1}_i$, $k \gets k+1$
+    \State Update $F_{k}$ with new failure cases
+\EndWhile
+\State \Return optimized prompt $p^*=p_{k}$
+\end{algorithmic}
+\end{algorithm}
+\vspace{-2mm}

@@ -1,0 +1,51 @@
+\section{Introduction}
+
+LLMs have demonstrated remarkable capabilities across a wide range of natural language processing (NLP) tasks, including machine translation~\cite{Qin2024LargeLM}, summarization~\cite{Goyal2022NewsSA}, and question answering~\cite{Zhang2023ExtractiveSV}.
+The dependency on prompt quality has led to the emergence of prompt engineering \cite{Diao2023ActivePW, White2023APP}, aiming at crafting effective prompts to elicit the desired responses from LLMs. 
+As the need for efficient prompt design becomes increasingly evident \cite{Liu2021GPTUT}, automatic prompt optimization has been introduced to streamline the prompt design process, ensuring that LLMs are utilized to their full potential \cite{Gao2021MakingPL,Liu2021PretrainPA,Reynolds2021PromptPF}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figs/intro_gcm.pdf}
+    \vspace{-4mm}
+    \caption{Average accuracy improvement on eight datasets with \emph{four} optimization steps.}
+    \label{fig:intro}
+    \vspace{-3mm}
+\end{figure}
+
+
+
+Automatic prompt optimization can be broadly categorized into gradient-based and gradient-free methods. 
+Gradient-based methods \cite{Shin2020ElicitingKF,Li2021PrefixTuningOC,Liu2021GPTUT,Liu2022PTuningPT} are devised for open-source LLMs to enable the optimization of prompts through adjustments based on model gradient.
+Gradient-free methods have emerged as the predominant approach for closed-source LLMs, which focuses on refining prompts without access to the model gradient \cite{Prasad2022GrIPSGE,Yang2023LargeLM,Guo2023ConnectingLL}. 
+Starting from initial prompts, these methods usually expand candidate prompts using searching methods \cite{Pryzant2023AutomaticPO,Wang2023PromptAgentSP} and then accepting the more prominent ones in an iterative manner. This paper focuses on gradient-free methods due to the distinguished abilities of closed-source LLMs and the challenge of optimizing their prompts with limited model information. 
+
+
+We argue that current gradient-free prompt optimization methods have not adequately considered the rate of convergence. 
+Typically, these methods demand an excessive number of optimization steps to obtain satisfactory prompts due to the limited access to model details, the vast discrete search space, and the uncertain optimization directions~\cite{Wang2023PromptAgentSP,Pan2023PlumPL,Yang2023LargeLM}. 
+Representative work such as OPRO \cite{Yang2023LargeLM} even necessitates nearly 200 optimization steps for some NLP tasks.  
+This requirement for excessive optimization steps makes existing methods impractical for real-world applications since users are understandably reluctant to tolerate extensive optimization steps to achieve satisfactory performance levels.
+Therefore, we aim to achieve accelerated prompt optimization, obtaining satisfactory performance via few optimization steps (\eg $<5$).  
+
+
+To achieve accelerated prompt optimization, two crucial factors need to be considered: high-quality initial prompts and effective optimization directions. 
+Firstly, the initialization of the prompt plays a crucial role in determining the efficiency
+of the optimization process \cite{Ye2023PromptEA}, whereas existing approaches pay insufficient attention to the impact of initialization on subsequent optimization. 
+Therefore, we aim to obtain initial prompts of high quality, laying a solid foundation to accelerate optimization process. 
+Secondly, the accelerated prompt optimization needs to identify the most effective optimization directions in each step, streamlining efficient optimization from the initial prompts. 
+Thus, we aim to design a more refined expansion tuned by experience and acceptance of candidate prompts enhanced by examination of failure cases. 
+
+
+
+
+To this end, we propose a dual-phase approach to achieve the accelerated gradient-free prompt optimization. 
+Our approach consists of two phases: high-quality initial prompt generation, and 
+experience-tuned optimization. 
+Firstly, we utilize a well-designed meta-instruction to guide the LLM in generating high-quality and structured initial prompts that contain task-specific information, including task type and description, output format and constraints, suggested reasoning process, and professional tips. 
+After that, we devise a sentence-level prompt optimization strategy for efficiently optimization on the long initial prompt, leveraging previous direction tuning experience, together with failure cases, to select sentences in the initial prompt to be expanded and accept effective prompt candidates.
+Extensive experiments (\cf Figure~\ref{fig:intro}) on three LLMs across several datasets confirm the effectiveness and superiority of our method. Our contributions are threefold:
+\begin{itemize}[leftmargin=*]
+    \item We reveal the issue of low convergence rate in gradient-free prompt optimization, and highlight the problem of accelerated prompt optimization.
+    \item We propose a dual-phase approach, achieving accelerated prompt optimization through high-quality initial prompt generation and experience-tuned optimization. 
+    \item We conduct extensive experiments, demonstrating that the proposed method achieves satisfying performance within few optimization steps.
+\end{itemize}
