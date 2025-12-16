@@ -180,7 +180,7 @@ const diffHtml = computed(() => {
   
   const diff = Diff.diffChars(leftItem.prompt, rightItem.prompt)
   
-  return diff.map(part => {
+  return diff.map((part: Diff.Change) => {
     // VS Code style diff colors (Dark theme)
     // Removed: Red background
     // Added: Green background
