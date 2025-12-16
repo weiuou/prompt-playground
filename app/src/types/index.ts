@@ -1,11 +1,20 @@
 // 消息角色类型
 export type MessageRole = 'system' | 'user' | 'assistant'
 
+export interface MessageAttachment {
+  id: string
+  type: 'image'
+  content: string // base64
+  name?: string
+  mimeType?: string
+}
+
 // 单条消息
 export interface ChatMessage {
   id: string
   role: MessageRole
   content: string
+  attachments?: MessageAttachment[]
 }
 
 // LLM 提供商

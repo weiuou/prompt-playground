@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatMessage, Variable, RunResult } from '@/types'
+import type { ChatMessage, Variable, RunResult, MessageAttachment } from '@/types'
 import { nanoid } from '@/utils/nanoid'
 import { applyVariables as applyTemplateVariables } from '@/utils/template'
 
@@ -31,11 +31,12 @@ export const usePromptStore = defineStore('prompt', () => {
   })
 
   // 添加用户消息
-  function addUserMessage(content: string = '') {
+  function addUserMessage(content: string = '', attachments: MessageAttachment[] = []) {
     messages.value.push({
       id: nanoid(),
       role: 'user',
-      content
+      content,
+      attachments
     })
   }
 

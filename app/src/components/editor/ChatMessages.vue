@@ -59,6 +59,13 @@ function parseMessage(content: string) {
         </n-button>
       </div>
 
+      <!-- 图片附件显示 -->
+      <div v-if="msg.attachments && msg.attachments.length > 0" class="message-attachments">
+        <div v-for="att in msg.attachments" :key="att.id" class="attachment-item">
+          <img :src="att.content" :alt="att.name" v-if="att.type === 'image'" />
+        </div>
+      </div>
+
       <!-- 默认显示原始文本框 -->
       <n-input
         v-if="!(msg.role === 'assistant' && parseMessage(msg.content).thinking) || (msg as any).showRaw"
@@ -96,6 +103,20 @@ function parseMessage(content: string) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.message-attachments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.attachment-item img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .role-label {

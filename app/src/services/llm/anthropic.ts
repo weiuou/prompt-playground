@@ -34,10 +34,37 @@ export class AnthropicClient implements LLMClient {
         temperature: request.params.temperature,
         top_p: request.params.topP,
         system: systemMessage?.content || undefined,
-        messages: otherMessages.map(m => ({
-          role: m.role,
-          content: m.content
-        }))
+        messages: otherMessages.map(m => {
+          if (m.attachments && m.attachments.length > 0) {
+            const contentParts: any[] = []
+            m.attachments.forEach(att => {
+              if (att.type === 'image') {
+                const matches = att.content.match(/^data:(.+);base64,(.+)$/)
+                if (matches) {
+                  contentParts.push({
+                    type: 'image',
+                    source: {
+                      type: 'base64',
+                      media_type: matches[1],
+                      data: matches[2]
+                    }
+                  })
+                }
+              }
+            })
+            if (m.content) {
+              contentParts.push({ type: 'text', text: m.content })
+            }
+            return {
+              role: m.role,
+              content: contentParts
+            }
+          }
+          return {
+            role: m.role,
+            content: m.content
+          }
+        })
       })
     })
 
@@ -77,10 +104,37 @@ export class AnthropicClient implements LLMClient {
           temperature: request.params.temperature,
           top_p: request.params.topP,
           system: systemMessage?.content || undefined,
-          messages: otherMessages.map(m => ({
-            role: m.role,
-            content: m.content
-          })),
+          messages: otherMessages.map(m => {
+            if (m.attachments && m.attachments.length > 0) {
+              const contentParts: any[] = []
+              m.attachments.forEach(att => {
+                if (att.type === 'image') {
+                  const matches = att.content.match(/^data:(.+);base64,(.+)$/)
+                  if (matches) {
+                    contentParts.push({
+                      type: 'image',
+                      source: {
+                        type: 'base64',
+                        media_type: matches[1],
+                        data: matches[2]
+                      }
+                    })
+                  }
+                }
+              })
+              if (m.content) {
+                contentParts.push({ type: 'text', text: m.content })
+              }
+              return {
+                role: m.role,
+                content: contentParts
+              }
+            }
+            return {
+              role: m.role,
+              content: m.content
+            }
+          }),
           stream: true
         })
       })

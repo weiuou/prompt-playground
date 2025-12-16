@@ -18,7 +18,9 @@ import {
   PlayOutline,
   TrashOutline,
   ListOutline,
-  HelpCircleOutline
+  HelpCircleOutline,
+  ImageOutline,
+  CloseCircleOutline
 } from '@vicons/ionicons5'
 import { useRouter } from 'vue-router'
 import { usePromptStore } from '@/stores/prompt'
@@ -26,7 +28,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { createLLMClient } from '@/services/llm'
 import { startTour } from '@/services/tour'
 import { nanoid } from '@/utils/nanoid'
-import type { RunResult } from '@/types'
+import type { RunResult, MessageAttachment } from '@/types'
 
 // Components
 import VariablePanel from '@/components/editor/VariablePanel.vue'
@@ -47,6 +49,81 @@ const showOptimizer = ref(false)
 
 // 新消息输入
 const newUserMessage = ref('')
+const currentAttachments = ref<MessageAttachment[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+
+function triggerFileUpload() {
+  fileInput.value?.click()
+}
+
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files || files.length === 0) return
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (!file) continue
+
+    if (!file.type.startsWith('image/')) {
+      message.warning(`File ${file.name} is not an image`)
+      continue
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result as string
+      currentAttachments.value.push({
+        id: nanoid(),
+        type: 'image',
+        content,
+        name: file.name,
+        mimeType: file.type
+      })
+    }
+    reader.readAsDataURL(file)
+  }
+  // reset input
+  target.value = ''
+}
+
+function removeAttachment(index: number) {
+  currentAttachments.value.splice(index, 1)
+}
+
+function handlePaste(event: ClipboardEvent) {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item) continue
+    
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file) {
+        // Prevent default paste behavior if it's an image
+        // We don't want the image binary data to be pasted into the text area
+        // event.preventDefault() 
+        // Note: preventing default here might block text pasting if mixed, 
+        // but usually for images we want to handle it manually.
+        
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const content = e.target?.result as string
+          currentAttachments.value.push({
+            id: nanoid(),
+            type: 'image',
+            content,
+            name: file.name || 'pasted-image.png',
+            mimeType: file.type
+          })
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+  }
+}
 
 // 运行
 async function handleRun() {
@@ -56,15 +133,16 @@ async function handleRun() {
   }
 
   // 确保有用户消息
-  if (promptStore.messages.length === 0 && !newUserMessage.value.trim()) {
-    message.warning('请输入消息')
+  if (promptStore.messages.length === 0 && !newUserMessage.value.trim() && currentAttachments.value.length === 0) {
+    message.warning('请输入消息或上传图片')
     return
   }
 
   // 如果有新消息，添加到消息列表
-  if (newUserMessage.value.trim()) {
-    promptStore.addUserMessage(newUserMessage.value.trim())
+  if (newUserMessage.value.trim() || currentAttachments.value.length > 0) {
+    promptStore.addUserMessage(newUserMessage.value.trim(), [...currentAttachments.value])
     newUserMessage.value = ''
+    currentAttachments.value = []
   }
 
   const builtMessages = promptStore.getBuiltMessages()
@@ -198,12 +276,39 @@ function handleClear() {
 
               <!-- 新消息输入 -->
               <div class="new-message">
-                <n-input
-                  v-model:value="newUserMessage"
-                  type="textarea"
-                  placeholder="输入消息... (支持变量 {{variable}})"
-                  :autosize="{ minRows: 3, maxRows: 6 }"
-                  @keydown.ctrl.enter="handleRun"
+                <!-- 附件预览 -->
+                <div v-if="currentAttachments.length > 0" class="attachment-preview">
+                  <div v-for="(att, index) in currentAttachments" :key="att.id" class="preview-item">
+                    <img :src="att.content" :alt="att.name" />
+                    <div class="preview-remove" @click="removeAttachment(index)">
+                      <n-icon><CloseCircleOutline /></n-icon>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="input-container">
+                  <n-button quaternary circle class="upload-btn" @click="triggerFileUpload">
+                    <template #icon>
+                      <n-icon><ImageOutline /></n-icon>
+                    </template>
+                  </n-button>
+                  <n-input
+                    v-model:value="newUserMessage"
+                    type="textarea"
+                    placeholder="输入消息... (支持变量 {{variable}}, 支持粘贴图片)"
+                    :autosize="{ minRows: 3, maxRows: 6 }"
+                    @keydown.ctrl.enter="handleRun"
+                    @paste="handlePaste"
+                    class="message-input"
+                  />
+                </div>
+                <input
+                  type="file"
+                  ref="fileInput"
+                  style="display: none"
+                  accept="image/*"
+                  multiple
+                  @change="handleFileSelect"
                 />
               </div>
 
@@ -288,6 +393,62 @@ function handleClear() {
 
 .new-message {
   margin-top: 8px;
+}
+
+.input-container {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.upload-btn {
+  margin-top: 2px;
+}
+
+.message-input {
+  flex: 1;
+}
+
+.attachment-preview {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-remove:hover {
+  color: #fff;
+  background: rgba(255, 0, 0, 0.8);
 }
 
 .actions {

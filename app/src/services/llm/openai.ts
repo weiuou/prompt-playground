@@ -65,10 +65,26 @@ export class OpenAIClient implements LLMClient {
     console.log('[OpenAIClient] chat Request URL:', url)
 
     // Handle Cache Prevention
-    let messages = request.messages.map(m => ({
-      role: m.role,
-      content: m.content
-    }))
+    let messages: any[] = request.messages.map(m => {
+      if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
+        return {
+          role: m.role,
+          content: [
+            { type: 'text', text: m.content },
+            ...m.attachments.map(att => ({
+              type: 'image_url',
+              image_url: {
+                url: att.content
+              }
+            }))
+          ]
+        }
+      }
+      return {
+        role: m.role,
+        content: m.content
+      }
+    })
 
     if (this.preventCache) {
        // Inject random system message at the end of system block or beginning of conversation
