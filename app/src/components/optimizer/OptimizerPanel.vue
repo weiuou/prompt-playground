@@ -198,7 +198,7 @@ const diffHtml = computed(() => {
   <div class="optimizer-panel">
     <n-card title="提示词优化器 (双阶段)" size="small">
       <template #header-extra>
-        <n-button text tag="a" href="/paper/acl_latex.pdf" target="_blank" type="primary">
+        <n-button text tag="a" href="https://github.com/weiuou/prompt-playground/blob/main/paper/acl_latex.pdf" target="_blank" type="primary">
           查看论文
         </n-button>
       </template>
