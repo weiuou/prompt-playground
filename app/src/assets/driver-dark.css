@@ -23,6 +23,15 @@
   font-size: 12px;
   cursor: pointer;
   transition: background-color 0.2s;
+  margin-left: 8px; /* 增加按钮间距 */
+  text-shadow: none !important; /* 修复文字重影问题 */
+  box-shadow: none !important;
+}
+
+.driver-popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .driver-popover button:hover {
