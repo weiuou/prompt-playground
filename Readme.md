@@ -18,7 +18,7 @@
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=weiuou/prompt-playground&type=Date)](https://star-history.com/#your-username/prompt-playground&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=weiuou/prompt-playground&type=Date)](https://star-history.com/#weiuou/prompt-playground&Date)
 
 ## ✨ 功能特性
 
