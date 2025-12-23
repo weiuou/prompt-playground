@@ -36,6 +36,7 @@ export interface TestCase {
   id: string
   name: string
   input: string
+  imageUrls?: string[] // Base64 图片数据列表
   expectedOutput: string // 依然保留，作为 Rule 和 Code 的参考值
   tags: string[]
   evaluation: EvaluationConfig // 新增：评估配置
@@ -78,6 +79,7 @@ export const useTestCasesStore = defineStore('testCases', () => {
       id: nanoid(),
       name: c.name || 'New Case',
       input: c.input || '',
+      imageUrls: c.imageUrls || [],
       expectedOutput: c.expectedOutput || '',
       tags: c.tags || [],
       evaluation: c.evaluation || {

@@ -2,6 +2,7 @@ import type { ModelParams } from '@/types'
 
 export interface Example {
   input: string
+  imageUrls?: string[]
   expectedOutput: string
 }
 

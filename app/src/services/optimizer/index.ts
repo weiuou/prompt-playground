@@ -366,11 +366,21 @@ ${draftPrompt}
     
     for (const ex of examples) {
       try {
+        const userMessage: any = { id: nanoid(), role: 'user', content: ex.input }
+        if (ex.imageUrls && ex.imageUrls.length > 0) {
+          userMessage.attachments = ex.imageUrls.map(url => ({
+            id: nanoid(),
+            type: 'image',
+            content: url,
+            name: 'test-case-image'
+          }))
+        }
+
         const res = await this.client.chat({
           model: this.config.evalModelId || this.config.modelId,
           messages: [
             { id: nanoid(), role: 'system', content: prompt },
-            { id: nanoid(), role: 'user', content: ex.input }
+            userMessage
           ],
           params: evalParams as any
         })
@@ -404,11 +414,21 @@ ${draftPrompt}
 
     for (const ex of examples) {
        try {
+        const userMessage: any = { id: nanoid(), role: 'user', content: ex.input }
+        if (ex.imageUrls && ex.imageUrls.length > 0) {
+          userMessage.attachments = ex.imageUrls.map(url => ({
+            id: nanoid(),
+            type: 'image',
+            content: url,
+            name: 'test-case-image'
+          }))
+        }
+
         const res = await this.client.chat({
           model: this.config.evalModelId || this.config.modelId,
           messages: [
             { id: nanoid(), role: 'system', content: prompt },
-            { id: nanoid(), role: 'user', content: ex.input }
+            userMessage
           ],
           params: evalParams as any
         })

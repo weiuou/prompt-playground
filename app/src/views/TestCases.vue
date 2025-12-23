@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   NLayout,
   NLayoutHeader,
@@ -21,7 +21,7 @@ import {
   type UploadFileInfo,
   useMessage
 } from 'naive-ui'
-import { AddOutline, ArrowBackOutline, TrashOutline, SettingsOutline, CloudDownloadOutline, CloudUploadOutline } from '@vicons/ionicons5'
+import { AddOutline, ArrowBackOutline, TrashOutline, SettingsOutline, CloudDownloadOutline, CloudUploadOutline, CloseOutline } from '@vicons/ionicons5'
 import { useRouter } from 'vue-router'
 import { useTestCasesStore, type TestCase, type EvaluationType } from '@/stores/testCases'
 import { storeToRefs } from 'pinia'
@@ -34,6 +34,143 @@ const { testCases } = storeToRefs(store)
 // 编辑模态框
 const showEditModal = ref(false)
 const editingCase = ref<TestCase | null>(null)
+const showAllEditingImages = ref(false)
+
+const showImagePreview = ref(false)
+const previewImages = ref<string[]>([])
+const previewIndex = ref(0)
+const previewScale = ref(1)
+const previewNaturalWidth = ref(0)
+const previewNaturalHeight = ref(0)
+
+function getCaseImages(c: any): string[] {
+  if (c?.imageUrls && Array.isArray(c.imageUrls) && c.imageUrls.length > 0) return c.imageUrls
+  if (c?.imageUrl) return [c.imageUrl]
+  return []
+}
+
+function openImagePreview(images: string[], index: number) {
+  previewImages.value = images
+  previewIndex.value = Math.min(Math.max(index, 0), Math.max(images.length - 1, 0))
+  previewScale.value = 1
+  previewNaturalWidth.value = 0
+  previewNaturalHeight.value = 0
+  showImagePreview.value = true
+}
+
+function closeImagePreview() {
+  showImagePreview.value = false
+}
+
+const currentPreviewSrc = computed(() => previewImages.value[previewIndex.value] || '')
+
+function setPreviewIndex(nextIndex: number) {
+  const total = previewImages.value.length
+  if (total <= 0) return
+  previewIndex.value = ((nextIndex % total) + total) % total
+  previewScale.value = 1
+  previewNaturalWidth.value = 0
+  previewNaturalHeight.value = 0
+}
+
+function prevPreview() {
+  setPreviewIndex(previewIndex.value - 1)
+}
+
+function nextPreview() {
+  setPreviewIndex(previewIndex.value + 1)
+}
+
+function zoomTo(scale: number) {
+  previewScale.value = Math.min(5, Math.max(0.1, scale))
+}
+
+function zoomIn() {
+  zoomTo(previewScale.value + 0.1)
+}
+
+function zoomOut() {
+  zoomTo(previewScale.value - 0.1)
+}
+
+function resetZoom() {
+  zoomTo(1)
+}
+
+function fitToScreen() {
+  const w = previewNaturalWidth.value
+  const h = previewNaturalHeight.value
+  if (!w || !h) {
+    resetZoom()
+    return
+  }
+  const maxW = window.innerWidth * 0.85
+  const maxH = window.innerHeight * 0.65
+  zoomTo(Math.min(maxW / w, maxH / h))
+}
+
+function onPreviewImageLoad(e: Event) {
+  const img = e.target as HTMLImageElement | null
+  if (!img) return
+  previewNaturalWidth.value = img.naturalWidth || 0
+  previewNaturalHeight.value = img.naturalHeight || 0
+}
+
+function handleViewerWheel(e: WheelEvent) {
+  if (!showImagePreview.value) return
+  if (e.deltaY < 0) zoomIn()
+  else zoomOut()
+}
+
+function handleViewerKeydown(e: KeyboardEvent) {
+  if (!showImagePreview.value) return
+  if (e.key === 'Escape') {
+    closeImagePreview()
+    return
+  }
+  if (e.key === 'ArrowLeft') {
+    prevPreview()
+    return
+  }
+  if (e.key === 'ArrowRight') {
+    nextPreview()
+    return
+  }
+  if (e.key === '+' || e.key === '=') {
+    zoomIn()
+    return
+  }
+  if (e.key === '-' || e.key === '_') {
+    zoomOut()
+    return
+  }
+  if (e.key === '0') {
+    resetZoom()
+    return
+  }
+  if (e.key === 'f' || e.key === 'F') {
+    fitToScreen()
+  }
+}
+
+watch(
+  () => showImagePreview.value,
+  (show) => {
+    if (show) window.addEventListener('keydown', handleViewerKeydown)
+    else window.removeEventListener('keydown', handleViewerKeydown)
+  }
+)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleViewerKeydown)
+})
+
+watch(
+  () => editingCase.value?.imageUrls?.length,
+  (len) => {
+    if (!len || len <= 1) showAllEditingImages.value = false
+  }
+)
 
 // 监听评估类型变化，自动初始化对应的 Config
 watch(() => editingCase.value?.evaluation.type, (newType) => {
@@ -77,11 +214,22 @@ const ruleOperatorOptions = [
 function handleEdit(c: TestCase) {
   // 深拷贝以避免直接修改 Store
   editingCase.value = JSON.parse(JSON.stringify(c))
+  // Ensure imageUrls exists
+  if (editingCase.value && !editingCase.value.imageUrls) {
+      editingCase.value.imageUrls = []
+  }
+  // Migrate legacy single image if present
+  if (editingCase.value && (editingCase.value as any).imageUrl) {
+      editingCase.value.imageUrls?.push((editingCase.value as any).imageUrl)
+      delete (editingCase.value as any).imageUrl
+  }
+  showAllEditingImages.value = false
   showEditModal.value = true
 }
 
 function handleCloseModal() {
   showEditModal.value = false
+  showAllEditingImages.value = false
   editingCase.value = null
 }
 
@@ -93,7 +241,7 @@ function handleSave() {
 }
 
 function handleAdd() {
-  store.addTestCase({})
+  store.addTestCase({ imageUrls: [] })
   // 自动打开刚添加的 Case 进行编辑
   const newCase = store.testCases[store.testCases.length - 1]
   if (newCase) {
@@ -175,6 +323,39 @@ function handleImport(options: { file: UploadFileInfo }) {
   reader.readAsText(file)
   return false // 阻止默认上传行为
 }
+
+function handlePaste(event: ClipboardEvent) {
+  const items = event.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (!item) continue
+    
+    if (item.type.indexOf('image') !== -1) {
+      const file = item.getAsFile()
+      if (file && editingCase.value) {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const content = e.target?.result as string
+          if (editingCase.value) {
+             if (!editingCase.value.imageUrls) {
+                 editingCase.value.imageUrls = []
+             }
+             editingCase.value.imageUrls.push(content)
+          }
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+  }
+}
+
+function removeImage(index: number) {
+    if (editingCase.value && editingCase.value.imageUrls) {
+        editingCase.value.imageUrls.splice(index, 1)
+    }
+}
 </script>
 
 <template>
@@ -241,6 +422,15 @@ function handleImport(options: { file: UploadFileInfo }) {
             <div class="field">
               <label>输入:</label>
               <div class="value text-truncate">{{ c.input }}</div>
+              
+              <div v-if="getCaseImages(c).length > 0" style="margin-top: 4px;">
+                <div class="case-image-thumb" @click="openImagePreview(getCaseImages(c), 0)">
+                  <img :src="getCaseImages(c)[0]" alt="case-image" />
+                  <div v-if="getCaseImages(c).length > 1" class="image-count-overlay">
+                    +{{ getCaseImages(c).length - 1 }}
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="field">
               <label>预期:</label>
@@ -261,7 +451,52 @@ function handleImport(options: { file: UploadFileInfo }) {
         <n-grid :cols="2" :x-gap="12">
           <n-grid-item>
             <n-form-item label="输入">
-              <n-input v-model:value="editingCase.input" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="Prompt 输入变量" />
+              <div style="width: 100%">
+                <div v-if="editingCase.imageUrls && editingCase.imageUrls.length > 0" style="margin-bottom: 8px;">
+                  <template v-if="editingCase.imageUrls.length > 1 && !showAllEditingImages">
+                    <div class="edit-image-collapsed" @click="showAllEditingImages = true">
+                      <img :src="editingCase.imageUrls[0]" alt="case-image" />
+                      <div class="image-count-overlay">
+                        +{{ editingCase.imageUrls.length - 1 }}
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div
+                      v-if="editingCase.imageUrls.length > 1"
+                      style="width: 100%; display: flex; justify-content: flex-end; margin-bottom: 6px;"
+                    >
+                      <n-button text size="tiny" @click="showAllEditingImages = false">折叠</n-button>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <div v-for="(url, idx) in editingCase.imageUrls" :key="idx" class="edit-image-item">
+                        <img
+                          :src="url"
+                          alt="case-image"
+                          @click="openImagePreview(editingCase.imageUrls, idx)"
+                          style="cursor: pointer;"
+                        />
+                        <n-button
+                          circle
+                          type="error"
+                          size="tiny"
+                          class="edit-image-remove"
+                          @click.stop="removeImage(idx)"
+                        >
+                          <template #icon><n-icon><CloseOutline /></n-icon></template>
+                        </n-button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                <n-input 
+                  v-model:value="editingCase.input" 
+                  type="textarea" 
+                  :autosize="{ minRows: 3, maxRows: 6 }" 
+                  placeholder="Prompt 输入变量 (支持 Ctrl+V 粘贴图片)" 
+                  @paste="handlePaste"
+                />
+              </div>
             </n-form-item>
           </n-grid-item>
           <n-grid-item>
@@ -341,6 +576,43 @@ function handleImport(options: { file: UploadFileInfo }) {
         <n-button type="primary" @click="handleSave">保存</n-button>
       </template>
     </n-modal>
+
+    <n-modal
+      v-model:show="showImagePreview"
+      preset="card"
+      style="width: min(92vw, 980px);"
+      @after-leave="resetZoom"
+    >
+      <div class="image-viewer" @wheel.prevent="handleViewerWheel">
+        <div class="image-viewer-toolbar">
+          <div class="image-viewer-status">
+            {{ previewImages.length ? `${previewIndex + 1} / ${previewImages.length}` : '' }}
+          </div>
+          <div class="image-viewer-actions">
+            <n-button size="small" :disabled="previewImages.length <= 1" @click="prevPreview">上一张</n-button>
+            <n-button size="small" :disabled="previewImages.length <= 1" @click="nextPreview">下一张</n-button>
+            <n-button size="small" @click="zoomOut">-</n-button>
+            <n-button size="small" @click="zoomIn">+</n-button>
+            <n-button size="small" @click="resetZoom">100%</n-button>
+            <n-button size="small" @click="fitToScreen">适配</n-button>
+            <n-button size="small" @click="closeImagePreview">关闭</n-button>
+          </div>
+        </div>
+        <div class="image-viewer-stage">
+          <div v-if="previewImages.length" class="image-viewer-index">
+            {{ previewIndex + 1 }}/{{ previewImages.length }}
+          </div>
+          <img
+            :src="currentPreviewSrc"
+            alt="preview"
+            class="image-viewer-img"
+            :style="{ transform: `scale(${previewScale})` }"
+            @load="onPreviewImageLoad"
+            @dblclick="resetZoom"
+          />
+        </div>
+      </div>
+    </n-modal>
   </n-layout>
 </template>
 
@@ -415,6 +687,130 @@ function handleImport(options: { file: UploadFileInfo }) {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-/* Dark mode overrides (assuming global dark mode class is applied or we use naive-ui variables) */
-/* Since we don't have explicit dark mode toggle yet, let's stick to naive-ui defaults */
-/* Naive UI components handle dark mode automatically if provided, but our custom CSS needs to be theme-aware or neutral */</style>
+.case-image-thumb {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.case-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-image-collapsed {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.edit-image-collapsed img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-image-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.edit-image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.edit-image-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 1;
+}
+
+.image-count-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.image-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.image-viewer-status {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.image-viewer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.image-viewer-stage {
+  height: 70vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.image-viewer-index {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.image-viewer-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center center;
+  user-select: none;
+}
+</style>
